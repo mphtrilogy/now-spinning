@@ -414,6 +414,14 @@ select option{background:white}
       </div>
       <div class="form-group full"><label class="field-label">Notes</label><textarea id="e-notes"></textarea></div>
       <div class="form-group full"><label class="field-label">Instagram Post URL <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:0.68rem;color:var(--muted2)">— leave blank if not posted</span></label><input type="url" id="e-instagram" placeholder="https://www.instagram.com/p/…"></div>
+      <div class="form-group full">
+        <label class="field-label">Album Cover Art</label>
+        <div class="img-drop" onclick="document.getElementById('e-image').click()">
+          <img class="img-preview-el" id="e-img-preview" src="" alt="">
+          <div class="img-drop-label" id="e-upload-label">Tap to upload or replace cover photo</div>
+          <input type="file" id="e-image" accept="image/*" onchange="handleEditImageUpload(event)">
+        </div>
+      </div>
     </div>
     <div class="form-actions">
       <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
@@ -456,7 +464,7 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let spins = [];
 let currentUser = null;
-let currentRating = 0, editRating = 0, editId = null, selectedMonth = null, imgData = '';
+let currentRating = 0, editRating = 0, editId = null, selectedMonth = null, imgData = '', editImgData = '';
 
 const todayStr = () => new Date().toISOString().split('T')[0];
 
@@ -727,6 +735,18 @@ function handleImageUpload(e) {
   r.readAsDataURL(file);
 }
 
+function handleEditImageUpload(e) {
+  const file = e.target.files[0]; if(!file) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    editImgData = ev.target.result;
+    const p = document.getElementById('e-img-preview');
+    p.src = editImgData; p.style.display = 'block';
+    document.getElementById('e-upload-label').textContent = 'Tap to change image';
+  };
+  r.readAsDataURL(file);
+}
+
 let searchTimer;
 function handleQuickSearch(val) {
   clearTimeout(searchTimer);
@@ -846,6 +866,15 @@ function openEdit(id) {
   document.getElementById('e-system').value=s.system||'';
   document.getElementById('e-notes').value=s.notes||'';
   document.getElementById('e-instagram').value=s.instagram_url||'';
+  editImgData = '';
+  const ep = document.getElementById('e-img-preview');
+  if (s.cover_image_url) {
+    ep.src = s.cover_image_url; ep.style.display = 'block';
+    document.getElementById('e-upload-label').textContent = 'Tap to change image';
+  } else {
+    ep.style.display = 'none'; ep.src = '';
+    document.getElementById('e-upload-label').textContent = 'Tap to upload or replace cover photo';
+  }
   document.querySelectorAll('#edit-star-picker .star-btn').forEach((b,i)=>b.classList.toggle('on',i<editRating));
   document.getElementById('edit-modal').classList.add('open');
 }
@@ -864,6 +893,7 @@ async function saveEdit() {
     instagram_url:document.getElementById('e-instagram').value.trim()||null,
     rating:       editRating||null,
   };
+  if (editImgData) changes.cover_image_url = editImgData;
   try {
     await updateSpin(editId, changes);
     const idx = spins.findIndex(s=>s.id===editId);
