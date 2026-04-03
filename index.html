@@ -222,7 +222,7 @@ select option{background:white}
   <div class="masthead-top">
     <div>
       <div class="brand-eyebrow">@nowspinningonvinyl</div>
-      <div class="brand-title" id="brand-logo" onclick="handleLogoClick()" style="cursor:default">Now <em>Spinning</em></div>
+      <div class="brand-title" id="brand-logo" style="cursor:default;user-select:none;-webkit-user-select:none">Now <em>Spinning</em></div>
     </div>
     <div class="masthead-right">
       <nav class="masthead-nav">
@@ -534,6 +534,7 @@ function handleAuthClick() {
   showToast('Signed out');
 }
 
+let logoClickCount = 0, logoClickTimer = null;
 function handleLogoClick() {
   logoClickCount++;
   clearTimeout(logoClickTimer);
@@ -541,11 +542,26 @@ function handleLogoClick() {
   if (logoClickCount >= 5) {
     logoClickCount = 0;
     if (currentUser) {
-      if (confirm('Sign out?')) db.auth.signOut();
+      if (confirm('Sign out?')) { db.auth.signOut(); showToast('Signed out'); }
     } else {
       openLogin();
     }
   }
+}
+
+// Long press on logo (better for mobile)
+let longPressTimer = null;
+function initLogoPress() {
+  const logo = document.getElementById('brand-logo');
+  const start = () => { longPressTimer = setTimeout(() => { logoClickCount = 5; handleLogoClick(); }, 2000); };
+  const cancel = () => clearTimeout(longPressTimer);
+  logo.addEventListener('touchstart', e => { e.preventDefault(); start(); }, { passive: false });
+  logo.addEventListener('touchend', cancel);
+  logo.addEventListener('touchmove', cancel);
+  logo.addEventListener('mousedown', start);
+  logo.addEventListener('mouseup', cancel);
+  logo.addEventListener('mouseleave', cancel);
+  logo.addEventListener('click', handleLogoClick);
 }
 
 function openLogin() {
@@ -1097,6 +1113,7 @@ function esc(s) {
 
 // ─── INIT ─────────────────────────────────────────────────────────
 document.getElementById('f-date').value = todayStr();
+initLogoPress();
 initAuth();
 loadSpins();
 </script>
