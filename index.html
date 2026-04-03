@@ -274,10 +274,27 @@ select option{background:white}
 <div class="section" id="sec-log">
   <div class="section-hd"><h1 id="log-title">Log a Spin</h1></div>
   <div class="form-wrap">
-    <div class="form-subsection" style="margin-bottom:1.1rem">Quick Lookup</div>
-    <div class="search-wrap" style="margin-bottom:1.5rem">
-      <input type="text" id="quick-search" placeholder="Search Discogs by artist or album title…" oninput="handleQuickSearch(this.value)" autocomplete="off">
-      <div class="suggestions" id="suggestions"></div>
+
+    <div class="form-subsection" style="margin-bottom:1.1rem">Discogs Lookup</div>
+    <div style="margin-bottom:1.5rem">
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <div class="search-wrap" style="flex:1">
+          <input type="text" id="quick-search" placeholder="Paste Discogs URL, release ID, or search by artist/album…" oninput="handleQuickSearch(this.value)" autocomplete="off">
+          <div class="suggestions" id="suggestions"></div>
+        </div>
+        <button class="btn btn-primary" style="white-space:nowrap;padding:9px 16px" onclick="lookupDiscogsInput()">Look Up</button>
+      </div>
+      <div style="font-family:var(--font-cond);font-size:0.65rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted2)">
+        Tip: paste a Discogs URL like discogs.com/release/12345 or just type the release ID number
+      </div>
+      <div id="discogs-preview" style="display:none;margin-top:1rem;background:var(--off);border:1px solid var(--rule);border-radius:4px;padding:1rem;display:none;align-items:center;gap:1rem">
+        <img id="discogs-preview-img" src="" alt="" style="width:64px;height:64px;object-fit:cover;border-radius:3px;flex-shrink:0;border:1px solid var(--rule)">
+        <div>
+          <div id="discogs-preview-artist" style="font-family:var(--font-head);font-size:1rem;font-weight:700;color:var(--ink)"></div>
+          <div id="discogs-preview-album" style="font-family:var(--font-head);font-style:italic;font-size:0.9rem;color:var(--ink2)"></div>
+          <div id="discogs-preview-meta" style="font-family:var(--font-cond);font-size:0.68rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-top:3px"></div>
+        </div>
+      </div>
     </div>
 
     <div class="form-subsection">Album Details</div>
@@ -747,51 +764,111 @@ function handleEditImageUpload(e) {
   r.readAsDataURL(file);
 }
 
+const DISCOGS_TOKEN = 'tvLvejtagdKdMyBFccxLBhdtECdaZnznvfyafAXr';
+const DISCOGS_HEADERS = { 'Authorization': `Discogs token=${DISCOGS_TOKEN}`, 'User-Agent': 'NowSpinningApp/1.0' };
+
+// Extract release ID from URL or plain number
+function extractDiscogsId(input) {
+  input = input.trim();
+  // Plain number
+  if (/^\d+$/.test(input)) return input;
+  // URL like discogs.com/release/12345 or discogs.com/*/release/12345-Title
+  const match = input.match(/release\/(\d+)/);
+  if (match) return match[1];
+  return null;
+}
+
+async function lookupDiscogsInput() {
+  const val = document.getElementById('quick-search').value.trim();
+  if (!val) return;
+  const id = extractDiscogsId(val);
+  if (id) {
+    await fetchDiscogsRelease(id);
+  } else {
+    handleQuickSearch(val);
+  }
+}
+
+async function fetchDiscogsRelease(id) {
+  try {
+    const r = await fetch(`https://api.discogs.com/releases/${id}`, { headers: DISCOGS_HEADERS });
+    const data = await r.json();
+    if (data.id) {
+      const artist = data.artists ? data.artists.map(a => a.name.replace(/\s*\(\d+\)$/, '')).join(', ') : '';
+      const album = data.title || '';
+      const year = data.year ? String(data.year) : '';
+      const label = data.labels ? data.labels[0].name : '';
+      const genre = data.genres ? data.genres[0] : (data.styles ? data.styles[0] : '');
+      const cover = data.images ? data.images[0].uri : '';
+      const url = `https://www.discogs.com/release/${data.id}`;
+      fillFromDiscogs({ artist, album, year, label, genre, cover, url });
+      showDiscogsPreview({ artist, album, year, label, genre, cover });
+      document.getElementById('suggestions').style.display = 'none';
+      document.getElementById('quick-search').value = '';
+    }
+  } catch(e) { showToast('Discogs lookup failed'); }
+}
+
+function showDiscogsPreview({ artist, album, year, label, genre, cover }) {
+  const preview = document.getElementById('discogs-preview');
+  document.getElementById('discogs-preview-img').src = cover || '';
+  document.getElementById('discogs-preview-img').style.display = cover ? 'block' : 'none';
+  document.getElementById('discogs-preview-artist').textContent = artist;
+  document.getElementById('discogs-preview-album').textContent = album;
+  document.getElementById('discogs-preview-meta').textContent = [year, label, genre].filter(Boolean).join(' · ');
+  preview.style.display = 'flex';
+}
+
 let searchTimer;
 function handleQuickSearch(val) {
   clearTimeout(searchTimer);
   const box = document.getElementById('suggestions');
-  if (!val||val.length<2) { box.style.display='none'; return; }
+  if (!val || val.length < 2) { box.style.display = 'none'; return; }
+  // If it looks like a URL or ID, don't search
+  if (extractDiscogsId(val)) { box.style.display = 'none'; return; }
   searchTimer = setTimeout(() => {
-    fetch(`https://api.discogs.com/database/search?q=${encodeURIComponent(val)}&type=release&per_page=8`)
-      .then(r=>r.json())
+    fetch(`https://api.discogs.com/database/search?q=${encodeURIComponent(val)}&type=release&per_page=8`, { headers: DISCOGS_HEADERS })
+      .then(r => r.json())
       .then(data => {
-        if (!data.results||!data.results.length) { box.style.display='none'; return; }
-        box.innerHTML = data.results.slice(0,7).map(r => {
-          const parts=(r.title||'').split(' - ');
-          const artist=parts[0]||'';
-          const album=parts.slice(1).join(' - ')||r.title;
-          const cover=r.cover_image||'';
-          const year=r.year||''; const label=r.label?r.label[0]:''; const genre=r.genre?r.genre[0]:'';
-          return `<div class="sug-item" onclick='fillFromDiscogs(${JSON.stringify({artist,album,year,label,genre,cover})})'>
-            ${cover?`<img class="sug-thumb" src="${cover}" alt="">`:'<div class="sug-thumb"></div>'}
+        if (!data.results || !data.results.length) { box.style.display = 'none'; return; }
+        box.innerHTML = data.results.slice(0, 7).map(r => {
+          const parts = (r.title || '').split(' - ');
+          const artist = parts[0] || '';
+          const album = parts.slice(1).join(' - ') || r.title;
+          const cover = r.cover_image || '';
+          const year = r.year || ''; const label = r.label ? r.label[0] : ''; const genre = r.genre ? r.genre[0] : '';
+          const rid = r.id || '';
+          return `<div class="sug-item" onclick='fetchDiscogsRelease("${rid}")'>
+            ${cover ? `<img class="sug-thumb" src="${cover}" alt="">` : '<div class="sug-thumb"></div>'}
             <div class="sug-text">
               <div class="sug-artist">${esc(artist)}</div>
-              <div class="sug-album">${esc(album)}${year?' · '+year:''}${label?' · '+label:''}</div>
+              <div class="sug-album">${esc(album)}${year ? ' · ' + year : ''}${label ? ' · ' + label : ''}</div>
             </div>
           </div>`;
         }).join('');
         box.style.display = 'block';
-      }).catch(()=>{
-        box.innerHTML=`<div class="sug-item"><div class="sug-text"><div class="sug-album" style="font-style:normal;color:var(--muted)">Add your Discogs API token to enable search</div></div></div>`;
-        box.style.display='block';
+      }).catch(() => {
+        box.innerHTML = `<div class="sug-item"><div class="sug-text"><div class="sug-album" style="font-style:normal;color:var(--muted)">Search unavailable — try pasting a Discogs URL instead</div></div></div>`;
+        box.style.display = 'block';
       });
   }, 400);
 }
 
 function fillFromDiscogs(d) {
-  document.getElementById('f-artist').value=d.artist||'';
-  document.getElementById('f-album').value=d.album||'';
-  document.getElementById('f-year').value=d.year||'';
-  document.getElementById('f-label').value=d.label||'';
-  document.getElementById('f-genre').value=d.genre||'';
-  if (d.cover&&!imgData) {
-    const p=document.getElementById('img-preview');
-    p.src=d.cover; p.style.display='block'; imgData=d.cover;
-    document.getElementById('upload-label').textContent='Tap to change image';
+  document.getElementById('f-artist').value = d.artist || '';
+  document.getElementById('f-album').value = d.album || '';
+  document.getElementById('f-year').value = d.year || '';
+  document.getElementById('f-label').value = d.label || '';
+  document.getElementById('f-genre').value = d.genre || '';
+  if (d.url) document.getElementById('f-discogs').value = d.url;
+  if (d.cover && !imgData) {
+    const p = document.getElementById('img-preview');
+    p.src = d.cover; p.style.display = 'block'; imgData = d.cover;
+    document.getElementById('upload-label').textContent = 'Tap to change image';
   }
-  document.getElementById('suggestions').style.display='none';
-  document.getElementById('quick-search').value='';
+  document.getElementById('suggestions').style.display = 'none';
+  document.getElementById('quick-search').value = '';
+  showToast('Filled from Discogs ✓');
 }
 
 document.addEventListener('click', e=>{
@@ -850,6 +927,7 @@ function clearForm() {
   imgData='';
   const p=document.getElementById('img-preview'); p.style.display='none'; p.src='';
   document.getElementById('upload-label').textContent='Tap to upload album cover photo';
+  document.getElementById('discogs-preview').style.display='none';
 }
 
 function openEdit(id) {
