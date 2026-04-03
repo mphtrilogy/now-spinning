@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Now Spinning — Mike's Vinyl Log</title>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Barlow:wght@300;400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --white:#ffffff;--off:#f7f5f2;--paper:#faf9f7;--rule:#e0dbd4;--rule2:#c8c1b8;
+  --ink:#1a1714;--ink2:#3d3830;--muted:#7a7268;--muted2:#a89e94;
+  --accent:#c0392b;--tag-bg:#f0ede8;--blue:#1a4a8a;--r:3px;
+  --font-head:'Libre Baskerville',Georgia,serif;
+  --font-body:'Barlow',sans-serif;
+  --font-cond:'Barlow Condensed',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+
+/* MASTHEAD */
+.masthead{background:var(--white);border-bottom:3px solid var(--ink);padding:0 2rem}
+.masthead-top{display:flex;align-items:center;justify-content:space-between;padding:1rem 0 0.75rem;gap:1rem}
+.brand-eyebrow{font-family:var(--font-cond);font-size:0.63rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--accent);line-height:1;margin-bottom:3px}
+.brand-title{font-family:var(--font-head);font-size:2rem;font-weight:700;letter-spacing:-0.02em;color:var(--ink);line-height:1}
+.brand-title em{font-style:italic;font-weight:400;color:var(--muted)}
+.masthead-right{display:flex;align-items:center;gap:10px}
+.masthead-nav{display:flex;gap:2px;background:var(--off);border:1px solid var(--rule);border-radius:4px;padding:3px}
+.nav-pill{font-family:var(--font-cond);font-size:0.76rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding:7px 16px;border-radius:3px;border:none;background:transparent;color:var(--muted);cursor:pointer;transition:all 0.15s;white-space:nowrap}
+.nav-pill:hover{color:var(--ink);background:var(--white)}
+.nav-pill.active{background:var(--ink);color:var(--white)}
+.nav-pill.owner-only{display:none}
+.stats-strip{display:flex;border-top:1px solid var(--rule);overflow-x:auto;scrollbar-width:none}
+.stats-strip::-webkit-scrollbar{display:none}
+.strip-stat{flex:1;min-width:90px;padding:0.55rem 1.25rem;border-right:1px solid var(--rule);display:flex;align-items:baseline;gap:8px}
+.strip-stat:last-child{border-right:none}
+.strip-num{font-family:var(--font-head);font-size:1.45rem;font-weight:700;color:var(--ink);line-height:1}
+.strip-label{font-family:var(--font-cond);font-size:0.65rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted)}
+
+/* AUTH BUTTON */
+.auth-btn{font-family:var(--font-cond);font-size:0.7rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;padding:6px 14px;border-radius:3px;border:1px solid var(--rule2);background:transparent;color:var(--muted);cursor:pointer;transition:all 0.14s;white-space:nowrap}
+.auth-btn:hover{border-color:var(--ink);color:var(--ink)}
+.auth-btn.signed-in{color:var(--accent);border-color:#f5c8c3}
+
+/* LOGIN MODAL */
+.login-overlay{display:none;position:fixed;inset:0;background:rgba(26,23,20,0.65);z-index:600;align-items:center;justify-content:center;padding:1rem}
+.login-overlay.open{display:flex}
+.login-box{background:var(--white);border-top:3px solid var(--ink);padding:2.5rem;max-width:380px;width:100%;border-radius:0 0 4px 4px;box-shadow:0 8px 40px rgba(0,0,0,0.2)}
+.login-title{font-family:var(--font-head);font-size:1.4rem;font-weight:700;margin-bottom:0.4rem}
+.login-sub{font-size:0.85rem;color:var(--muted);margin-bottom:1.75rem;font-style:italic}
+.login-group{display:flex;flex-direction:column;gap:5px;margin-bottom:1rem}
+.login-label{font-family:var(--font-cond);font-size:0.67rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted)}
+.login-input{font-family:var(--font-body);font-size:0.9rem;padding:10px 12px;border:1px solid var(--rule2);border-radius:var(--r);background:var(--white);color:var(--ink);outline:none;width:100%;transition:border-color 0.12s}
+.login-input:focus{border-color:var(--ink)}
+.login-err{font-size:0.8rem;color:var(--accent);margin-top:4px;min-height:1.2em;font-style:italic}
+.login-actions{display:flex;gap:0.75rem;justify-content:flex-end;margin-top:1.5rem}
+
+/* LAYOUT */
+main{max-width:860px;margin:0 auto;padding:2.5rem 1.5rem 5rem}
+.section{display:none}
+.section.active{display:block}
+
+/* FEED TOOLBAR */
+.feed-toolbar{display:flex;gap:0.75rem;margin-bottom:1.25rem;flex-wrap:wrap;align-items:center}
+.search-input{flex:1;min-width:160px;font-family:var(--font-body);font-size:0.9rem;padding:8px 12px;border:1px solid var(--rule2);border-radius:var(--r);background:var(--white);color:var(--ink);outline:none}
+.search-input:focus{border-color:var(--ink)}
+.search-input::placeholder{color:var(--muted2)}
+.filter-sel{font-family:var(--font-cond);font-size:0.74rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:8px 10px;border:1px solid var(--rule2);border-radius:var(--r);background:var(--white);color:var(--ink2);outline:none;cursor:pointer}
+.month-row{display:flex;gap:5px;overflow-x:auto;padding-bottom:2px;margin-bottom:1.75rem;scrollbar-width:none}
+.month-row::-webkit-scrollbar{display:none}
+.month-tag{flex-shrink:0;font-family:var(--font-cond);font-size:0.68rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;padding:5px 13px;border:1px solid var(--rule2);border-radius:20px;background:var(--white);color:var(--muted);cursor:pointer;transition:all 0.12s}
+.month-tag:hover{border-color:var(--ink);color:var(--ink)}
+.month-tag.active{background:var(--ink);border-color:var(--ink);color:var(--white)}
+
+/* SECTION HEADER */
+.section-hd{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid var(--ink);padding-bottom:6px;margin-bottom:1.75rem}
+.section-hd h1{font-family:var(--font-head);font-size:1.5rem;font-weight:700;letter-spacing:-0.01em}
+.section-hd .count{font-family:var(--font-cond);font-size:0.68rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted)}
+
+/* DATE RULE */
+.date-rule{display:flex;align-items:center;gap:12px;margin:2rem 0 1rem}
+.date-rule:first-child{margin-top:0}
+.date-rule span{font-family:var(--font-cond);font-size:0.66rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.date-rule::before,.date-rule::after{content:'';flex:1;height:1px;background:var(--rule)}
+
+/* SPIN CARD */
+.spin-card{background:var(--white);border:1px solid var(--rule);border-radius:4px;display:grid;grid-template-columns:120px 1fr;overflow:hidden;margin-bottom:2px;transition:box-shadow 0.15s}
+.spin-card:hover{box-shadow:0 2px 12px rgba(0,0,0,0.09);position:relative;z-index:1}
+.cover-wrap{width:120px;height:120px;flex-shrink:0;overflow:hidden;background:var(--off);position:relative}
+.cover-wrap img{width:100%;height:100%;object-fit:cover;display:block}
+.cover-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#e8e4de}
+.cover-vinyl{width:62px;height:62px;border-radius:50%;background:#1e1e1e;border:2px solid #3a3a3a;position:relative}
+.cover-vinyl::before{content:'';position:absolute;inset:6px;border-radius:50%;background:repeating-conic-gradient(#2a2a2a 0deg 3deg,#222 3deg 6deg)}
+.cover-vinyl::after{content:'';position:absolute;width:11px;height:11px;background:#666;border-radius:50%;top:50%;left:50%;transform:translate(-50%,-50%)}
+.card-body{padding:0.9rem 1.1rem 0.8rem;display:flex;flex-direction:column;justify-content:space-between;min-height:120px}
+.card-artist{font-family:var(--font-head);font-size:1.05rem;font-weight:700;letter-spacing:-0.01em;color:var(--ink);line-height:1.2}
+.card-album{font-family:var(--font-head);font-style:italic;font-size:0.93rem;color:var(--ink2);margin-top:1px;line-height:1.3}
+.card-notes{font-size:0.8rem;color:var(--muted);margin-top:5px;line-height:1.4;font-style:italic;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card-bottom{display:flex;align-items:center;justify-content:space-between;margin-top:8px;flex-wrap:wrap;gap:5px}
+.card-meta{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.pill{font-family:var(--font-cond);font-size:0.63rem;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;padding:2px 7px;border-radius:2px;background:var(--tag-bg);color:var(--muted);border:1px solid var(--rule)}
+.pill-red{background:#fff0ee;color:var(--accent);border-color:#f5c8c3}
+.pill-blue{background:#eaf0f8;color:var(--blue);border-color:#c5d5e8}
+.pill-green{background:#eef5ee;color:#2a6b2a;border-color:#b8d8b8}
+.pill-grade{background:#1a1714;color:#f5edd8;border-color:#1a1714;font-size:0.62rem;letter-spacing:0.1em}
+.stars-row{color:var(--accent);font-size:0.78rem;letter-spacing:1px}
+.stars-empty{color:var(--rule2)}
+.ext-links{display:flex;gap:4px;flex-wrap:wrap}
+.ext-link{font-family:var(--font-cond);font-size:0.62rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;padding:3px 8px;border:1px solid var(--rule2);border-radius:2px;color:var(--muted);text-decoration:none;transition:all 0.12s}
+.ext-link:hover{border-color:var(--ink);color:var(--ink);background:var(--off)}
+.card-actions{display:flex;gap:4px}
+.icon-btn{width:26px;height:26px;border:1px solid var(--rule);border-radius:3px;background:transparent;color:var(--muted2);font-size:0.78rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.12s}
+.icon-btn:hover{border-color:var(--ink);color:var(--ink)}
+.icon-btn.del:hover{border-color:var(--accent);color:var(--accent)}
+
+/* EMPTY */
+.empty-state{text-align:center;padding:5rem 2rem;color:var(--muted2)}
+.empty-big{font-family:var(--font-head);font-size:2.5rem;font-weight:400;font-style:italic;color:var(--rule2);margin-bottom:0.75rem}
+.empty-state p{font-family:var(--font-head);font-style:italic;font-size:1rem;color:var(--muted2)}
+
+/* LOADING */
+.loading{text-align:center;padding:4rem 2rem}
+.loading p{font-family:var(--font-cond);font-size:0.72rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted2)}
+
+/* LOG FORM */
+.form-wrap{background:var(--white);border:1px solid var(--rule);border-top:3px solid var(--ink);padding:2rem;border-radius:0 0 4px 4px}
+.field-label{font-family:var(--font-cond);font-size:0.67rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px}
+.form-subsection{font-family:var(--font-cond);font-size:0.68rem;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink);border-bottom:1px solid var(--rule2);padding-bottom:5px;margin-bottom:1.1rem}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem 1.25rem;margin-bottom:1.5rem}
+.form-group{display:flex;flex-direction:column}
+.form-group.full{grid-column:1/-1}
+input[type="text"],input[type="date"],input[type="url"],input[type="email"],input[type="password"],textarea,select{font-family:var(--font-body);font-size:0.9rem;padding:9px 11px;border:1px solid var(--rule2);border-radius:var(--r);background:var(--white);color:var(--ink);outline:none;width:100%;transition:border-color 0.12s}
+input:focus,textarea:focus,select:focus{border-color:var(--ink)}
+input::placeholder,textarea::placeholder{color:var(--muted2);font-style:italic}
+textarea{resize:vertical;min-height:72px}
+select option{background:white}
+
+/* SEARCH */
+.search-wrap{position:relative}
+.suggestions{position:absolute;top:calc(100% + 2px);left:0;right:0;background:var(--white);border:1px solid var(--ink);border-radius:var(--r);z-index:300;max-height:240px;overflow-y:auto;display:none;box-shadow:0 4px 20px rgba(0,0,0,0.12)}
+.sug-item{padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--rule);display:flex;align-items:center;gap:10px;transition:background 0.1s}
+.sug-item:hover{background:var(--off)}
+.sug-thumb{width:36px;height:36px;object-fit:cover;border-radius:2px;flex-shrink:0;background:var(--off)}
+.sug-text{flex:1;min-width:0}
+.sug-artist{font-family:var(--font-head);font-size:0.85rem;font-weight:700;color:var(--ink)}
+.sug-album{font-size:0.78rem;color:var(--muted);font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* STARS */
+.star-row{display:flex;gap:3px;margin-top:2px}
+.star-btn{background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--rule2);transition:color 0.1s;padding:0;line-height:1}
+.star-btn.on{color:var(--accent)}
+
+/* IMAGE UPLOAD */
+.img-drop{border:2px dashed var(--rule2);border-radius:var(--r);padding:1.25rem;text-align:center;cursor:pointer;transition:border-color 0.15s;background:var(--off)}
+.img-drop:hover{border-color:var(--ink)}
+.img-drop input{display:none}
+.img-preview-el{display:none;max-width:90px;max-height:90px;margin:0 auto 8px;border-radius:3px;border:1px solid var(--rule)}
+.img-drop-label{font-family:var(--font-cond);font-size:0.68rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted2)}
+
+/* BUTTONS */
+.btn{font-family:var(--font-cond);font-size:0.76rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding:10px 22px;border-radius:var(--r);cursor:pointer;border:none;transition:all 0.14s}
+.btn-primary{background:var(--ink);color:var(--white)}
+.btn-primary:hover{background:var(--ink2)}
+.btn-ghost{background:var(--white);border:1px solid var(--rule2);color:var(--muted)}
+.btn-ghost:hover{border-color:var(--ink);color:var(--ink)}
+.btn:disabled{opacity:0.5;cursor:not-allowed}
+.form-actions{display:flex;gap:0.75rem;justify-content:flex-end;margin-top:1.5rem}
+
+/* STATS */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:4px;overflow:hidden;margin-bottom:2rem}
+.stat-box{background:var(--white);padding:1.25rem 1rem;text-align:center}
+.stat-box .n{font-family:var(--font-head);font-size:2.2rem;font-weight:700;color:var(--ink);line-height:1;display:block}
+.stat-box .l{font-family:var(--font-cond);font-size:0.63rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-top:4px;display:block}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+.list-card{background:var(--white);border:1px solid var(--rule);border-top:2px solid var(--ink);padding:1.25rem;border-radius:0 0 4px 4px}
+.list-card .card-title{font-family:var(--font-cond);font-size:0.68rem;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);margin-bottom:1rem}
+.list-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--rule);gap:8px}
+.list-row:last-child{border-bottom:none}
+.list-row .name{font-family:var(--font-head);font-size:0.87rem;color:var(--ink);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list-row .val{font-family:var(--font-cond);font-size:0.76rem;font-weight:700;color:var(--accent);flex-shrink:0}
+.bar-section{background:var(--white);border:1px solid var(--rule);border-top:2px solid var(--ink);padding:1.25rem;border-radius:0 0 4px 4px;margin-bottom:1.5rem}
+.bar-section .card-title{font-family:var(--font-cond);font-size:0.68rem;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);margin-bottom:1rem}
+.bar-chart{display:flex;align-items:flex-end;gap:6px;height:80px}
+.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end}
+.bar-fill{width:100%;background:var(--ink);border-radius:2px 2px 0 0;min-height:3px}
+.bar-lbl{font-family:var(--font-cond);font-size:0.57rem;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:var(--muted2);text-align:center}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(26,23,20,0.6);z-index:500;align-items:center;justify-content:center;padding:1rem}
+.modal-overlay.open{display:flex}
+.modal-box{background:var(--white);border-top:3px solid var(--ink);padding:2rem;max-width:520px;width:100%;max-height:92vh;overflow-y:auto;border-radius:0 0 4px 4px;box-shadow:0 8px 40px rgba(0,0,0,0.2)}
+.modal-title{font-family:var(--font-head);font-size:1.35rem;font-weight:700;margin-bottom:1.5rem;color:var(--ink)}
+
+/* TOAST */
+.toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(80px);background:var(--ink);color:var(--white);font-family:var(--font-cond);font-size:0.73rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding:12px 24px;border-radius:3px;z-index:9999;transition:transform 0.25s ease;pointer-events:none}
+.toast.show{transform:translateX(-50%) translateY(0)}
+
+/* RESPONSIVE */
+@media(max-width:600px){
+  .masthead{padding:0 1rem}
+  .brand-title{font-size:1.4rem}
+  main{padding:1.5rem 1rem 4rem}
+  .spin-card{grid-template-columns:96px 1fr}
+  .cover-wrap{width:96px;height:96px}
+  .card-body{min-height:96px;padding:0.7rem 0.8rem}
+  .form-grid{grid-template-columns:1fr}
+  .two-col{grid-template-columns:1fr}
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .nav-pill{padding:6px 10px;font-size:0.7rem}
+  .strip-stat{padding:0.5rem 0.75rem}
+  .form-wrap{padding:1.25rem}
+  .masthead-right{gap:6px}
+}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-top">
+    <div>
+      <div class="brand-eyebrow">@nowspinningonvinyl</div>
+      <div class="brand-title">Now <em>Spinning</em></div>
+    </div>
+    <div class="masthead-right">
+      <nav class="masthead-nav">
+        <button class="nav-pill active" onclick="showSection('feed',this)">The Log</button>
+        <button class="nav-pill owner-only" onclick="showSection('log',this)">+ Log Spin</button>
+        <button class="nav-pill" onclick="showSection('stats',this)">Stats</button>
+      </nav>
+      <button class="auth-btn" id="auth-btn" onclick="handleAuthClick()">Sign In</button>
+    </div>
+  </div>
+  <div class="stats-strip">
+    <div class="strip-stat"><span class="strip-num" id="s-total">—</span><span class="strip-label">Spins</span></div>
+    <div class="strip-stat"><span class="strip-num" id="s-month">—</span><span class="strip-label">This Month</span></div>
+    <div class="strip-stat"><span class="strip-num" id="s-artists">—</span><span class="strip-label">Artists</span></div>
+    <div class="strip-stat"><span class="strip-num" id="s-streak">—</span><span class="strip-label">Day Streak</span></div>
+  </div>
+</header>
+
+<main>
+
+<!-- FEED -->
+<div class="section active" id="sec-feed">
+  <div class="feed-toolbar">
+    <input class="search-input" type="text" id="search-feed" placeholder="Search artist or album…" oninput="renderFeed()">
+    <select class="filter-sel" id="filter-system" onchange="renderFeed()">
+      <option value="">All Systems</option>
+      <option>Technics SL-1210GR</option>
+      <option>Realistic LAB-420</option>
+      <option>Pioneer PL-112D</option>
+      <option>Sansui FR-D35</option>
+      <option>U-Turn</option>
+      <option>Pro-Ject III (Sgt. Pepper's)</option>
+      <option>Dual 1229</option>
+    </select>
+    <select class="filter-sel" id="filter-rating" onchange="renderFeed()">
+      <option value="">All Ratings</option>
+      <option value="5">★★★★★</option>
+      <option value="4">★★★★+</option>
+      <option value="3">★★★+</option>
+    </select>
+  </div>
+  <div class="month-row" id="month-row"></div>
+  <div class="section-hd">
+    <h1>The Ledger</h1>
+    <span class="count" id="feed-count"></span>
+  </div>
+  <div id="feed-list"><div class="loading"><p>Loading…</p></div></div>
+</div>
+
+<!-- LOG SPIN (owner only) -->
+<div class="section" id="sec-log">
+  <div class="section-hd"><h1 id="log-title">Log a Spin</h1></div>
+  <div class="form-wrap">
+    <div class="form-subsection" style="margin-bottom:1.1rem">Quick Lookup</div>
+    <div class="search-wrap" style="margin-bottom:1.5rem">
+      <input type="text" id="quick-search" placeholder="Search Discogs by artist or album title…" oninput="handleQuickSearch(this.value)" autocomplete="off">
+      <div class="suggestions" id="suggestions"></div>
+    </div>
+
+    <div class="form-subsection">Album Details</div>
+    <div class="form-grid">
+      <div class="form-group"><label class="field-label">Artist *</label><input type="text" id="f-artist" placeholder="e.g. Neil Young"></div>
+      <div class="form-group"><label class="field-label">Album *</label><input type="text" id="f-album" placeholder="e.g. Harvest"></div>
+      <div class="form-group"><label class="field-label">Label</label><input type="text" id="f-label" placeholder="e.g. Reprise Records"></div>
+      <div class="form-group"><label class="field-label">Year</label><input type="text" id="f-year" placeholder="e.g. 1972"></div>
+      <div class="form-group"><label class="field-label">Genre</label><input type="text" id="f-genre" placeholder="e.g. Classic Rock, Folk"></div>
+      <div class="form-group"><label class="field-label">Date Played *</label><input type="date" id="f-date"></div>
+      <div class="form-group">
+        <label class="field-label">Record Grade</label>
+        <select id="f-grade">
+          <option value="">Select grade…</option>
+          <option value="M">M — Mint</option>
+          <option value="NM">NM — Near Mint</option>
+          <option value="VG+">VG+ — Very Good Plus</option>
+          <option value="VG">VG — Very Good</option>
+          <option value="G+">G+ — Good Plus</option>
+          <option value="G">G — Good</option>
+          <option value="F">F — Fair</option>
+          <option value="P">P — Poor</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-subsection">Album Cover Art</div>
+    <div class="img-drop" style="margin-bottom:1.5rem" onclick="document.getElementById('f-image').click()">
+      <img class="img-preview-el" id="img-preview" src="" alt="">
+      <div class="img-drop-label" id="upload-label">Tap to upload album cover photo</div>
+      <input type="file" id="f-image" accept="image/*" onchange="handleImageUpload(event)">
+    </div>
+
+    <div class="form-subsection">Session</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="field-label">Rating</label>
+        <div class="star-row" id="star-picker">
+          <button class="star-btn" onclick="setStar(1)">★</button>
+          <button class="star-btn" onclick="setStar(2)">★</button>
+          <button class="star-btn" onclick="setStar(3)">★</button>
+          <button class="star-btn" onclick="setStar(4)">★</button>
+          <button class="star-btn" onclick="setStar(5)">★</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="field-label">Turntable / System</label>
+        <select id="f-system">
+          <option value="">Select system…</option>
+          <option>Technics SL-1210GR</option>
+          <option>Realistic LAB-420</option>
+          <option>Pioneer PL-112D</option>
+          <option>Sansui FR-D35</option>
+          <option>U-Turn</option>
+          <option>Pro-Ject III (Sgt. Pepper's)</option>
+          <option>Dual 1229</option>
+        </select>
+      </div>
+      <div class="form-group full">
+        <label class="field-label">Listening Notes</label>
+        <textarea id="f-notes" placeholder="How did it sound? What mood? Any memories this one stirred…"></textarea>
+      </div>
+    </div>
+
+    <div class="form-subsection">External Links <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:0.68rem;color:var(--muted2)">(optional — Discogs &amp; Wiki auto-generated if blank)</span></div>
+    <div class="form-grid">
+      <div class="form-group"><label class="field-label">Discogs URL</label><input type="url" id="f-discogs" placeholder="https://www.discogs.com/…"></div>
+      <div class="form-group"><label class="field-label">Wikipedia URL</label><input type="url" id="f-wiki" placeholder="https://en.wikipedia.org/…"></div>
+      <div class="form-group full"><label class="field-label">Instagram Post URL <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:0.68rem;color:var(--muted2)">— leave blank if not posted</span></label><input type="url" id="f-instagram" placeholder="https://www.instagram.com/p/…"></div>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="clearForm()">Clear</button>
+      <button class="btn btn-primary" id="save-btn" onclick="saveEntry()">Log This Spin →</button>
+    </div>
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="section" id="sec-stats">
+  <div class="section-hd"><h1>Record Room Stats</h1></div>
+  <div id="stats-content"></div>
+</div>
+
+</main>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal-box">
+    <div class="modal-title">Edit Entry</div>
+    <div class="form-grid">
+      <div class="form-group"><label class="field-label">Artist</label><input type="text" id="e-artist"></div>
+      <div class="form-group"><label class="field-label">Album</label><input type="text" id="e-album"></div>
+      <div class="form-group"><label class="field-label">Label</label><input type="text" id="e-label"></div>
+      <div class="form-group"><label class="field-label">Year</label><input type="text" id="e-year"></div>
+      <div class="form-group"><label class="field-label">Genre</label><input type="text" id="e-genre"></div>
+      <div class="form-group"><label class="field-label">Date Played</label><input type="date" id="e-date"></div>
+      <div class="form-group">
+        <label class="field-label">Record Grade</label>
+        <select id="e-grade">
+          <option value="">Select grade…</option>
+          <option value="M">M — Mint</option>
+          <option value="NM">NM — Near Mint</option>
+          <option value="VG+">VG+ — Very Good Plus</option>
+          <option value="VG">VG — Very Good</option>
+          <option value="G+">G+ — Good Plus</option>
+          <option value="G">G — Good</option>
+          <option value="F">F — Fair</option>
+          <option value="P">P — Poor</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="field-label">System</label>
+        <select id="e-system">
+          <option value="">Select…</option>
+          <option>Technics SL-1210GR</option>
+          <option>Realistic LAB-420</option>
+          <option>Pioneer PL-112D</option>
+          <option>Sansui FR-D35</option>
+          <option>U-Turn</option>
+          <option>Pro-Ject III (Sgt. Pepper's)</option>
+          <option>Dual 1229</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="field-label">Rating</label>
+        <div class="star-row" id="edit-star-picker">
+          <button class="star-btn" onclick="setEditStar(1)">★</button>
+          <button class="star-btn" onclick="setEditStar(2)">★</button>
+          <button class="star-btn" onclick="setEditStar(3)">★</button>
+          <button class="star-btn" onclick="setEditStar(4)">★</button>
+          <button class="star-btn" onclick="setEditStar(5)">★</button>
+        </div>
+      </div>
+      <div class="form-group full"><label class="field-label">Notes</label><textarea id="e-notes"></textarea></div>
+      <div class="form-group full"><label class="field-label">Instagram Post URL <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:0.68rem;color:var(--muted2)">— leave blank if not posted</span></label><input type="url" id="e-instagram" placeholder="https://www.instagram.com/p/…"></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEdit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOGIN MODAL -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-box">
+    <div class="login-title">Welcome back, Mike.</div>
+    <div class="login-sub">Sign in to log and edit spins.</div>
+    <div class="login-group">
+      <label class="login-label">Email</label>
+      <input class="login-input" type="email" id="login-email" placeholder="your@email.com" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div class="login-group">
+      <label class="login-label">Password</label>
+      <input class="login-input" type="password" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div class="login-err" id="login-err"></div>
+    <div class="login-actions">
+      <button class="btn btn-ghost" onclick="closeLogin()">Cancel</button>
+      <button class="btn btn-primary" id="login-btn" onclick="doLogin()">Sign In →</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── CONFIGURATION ───────────────────────────────────────────────
+// Replace these two values with your actual Supabase project details
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+// ─────────────────────────────────────────────────────────────────
+
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let spins = [];
+let currentUser = null;
+let currentRating = 0, editRating = 0, editId = null, selectedMonth = null, imgData = '';
+
+const todayStr = () => new Date().toISOString().split('T')[0];
+
+// ─── AUTH ─────────────────────────────────────────────────────────
+async function initAuth() {
+  const { data: { session } } = await db.auth.getSession();
+  if (session) setUser(session.user);
+
+  db.auth.onAuthStateChange((_event, session) => {
+    setUser(session ? session.user : null);
+  });
+}
+
+function setUser(user) {
+  currentUser = user;
+  const btn = document.getElementById('auth-btn');
+  if (user) {
+    btn.textContent = 'Sign Out';
+    btn.classList.add('signed-in');
+    document.querySelectorAll('.owner-only').forEach(el => el.style.display = '');
+    document.querySelectorAll('.card-actions').forEach(el => el.style.display = 'flex');
+  } else {
+    btn.textContent = 'Sign In';
+    btn.classList.remove('signed-in');
+    document.querySelectorAll('.owner-only').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.card-actions').forEach(el => el.style.display = 'none');
+    // If on log section, redirect to feed
+    if (document.getElementById('sec-log').classList.contains('active')) {
+      showSection('feed', document.querySelector('.nav-pill'));
+    }
+  }
+}
+
+function handleAuthClick() {
+  if (currentUser) {
+    db.auth.signOut();
+    showToast('Signed out');
+  } else {
+    openLogin();
+  }
+}
+
+function openLogin() {
+  document.getElementById('login-overlay').classList.add('open');
+  document.getElementById('login-email').focus();
+  document.getElementById('login-err').textContent = '';
+}
+
+function closeLogin() {
+  document.getElementById('login-overlay').classList.remove('open');
+  document.getElementById('login-password').value = '';
+}
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const btn = document.getElementById('login-btn');
+  const err = document.getElementById('login-err');
+
+  if (!email || !password) { err.textContent = 'Email and password required.'; return; }
+  btn.textContent = 'Signing in…'; btn.disabled = true; err.textContent = '';
+
+  const { error } = await db.auth.signInWithPassword({ email, password });
+  btn.textContent = 'Sign In →'; btn.disabled = false;
+
+  if (error) { err.textContent = error.message; return; }
+  closeLogin();
+  showToast('Welcome back, Mike');
+}
+
+// ─── DATA ─────────────────────────────────────────────────────────
+async function loadSpins() {
+  const { data, error } = await db
+    .from('spins')
+    .select('*')
+    .order('date_played', { ascending: false });
+
+  if (error) { console.error(error); return; }
+  spins = data || [];
+  renderFeed();
+  buildMonthFilter();
+  updateStats();
+}
+
+async function insertSpin(entry) {
+  const { data, error } = await db.from('spins').insert([entry]).select().single();
+  if (error) throw error;
+  return data;
+}
+
+async function updateSpin(id, changes) {
+  const { error } = await db.from('spins').update(changes).eq('id', id);
+  if (error) throw error;
+}
+
+async function deleteSpin(id) {
+  if (!confirm('Remove this spin from the ledger?')) return;
+  const { error } = await db.from('spins').delete().eq('id', id);
+  if (error) { showToast('Error removing spin'); return; }
+  spins = spins.filter(s => s.id !== id);
+  renderFeed(); buildMonthFilter(); updateStats();
+  showToast('Removed');
+}
+
+// ─── UI ───────────────────────────────────────────────────────────
+function showSection(id, btn) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-pill').forEach(b => b.classList.remove('active'));
+  document.getElementById('sec-' + id).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (id === 'log' && !currentUser) { openLogin(); return; }
+  if (id === 'log') {
+    editId = null;
+    document.getElementById('log-title').textContent = 'Log a Spin';
+    document.getElementById('f-date').value = todayStr();
+  }
+  if (id === 'stats') renderStats();
+}
+
+function updateStats() {
+  const now = new Date();
+  const thisMonth = spins.filter(s => {
+    const d = new Date(s.date_played + 'T12:00:00');
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  }).length;
+  const artists = new Set(spins.map(s => s.artist)).size;
+  const dateset = new Set(spins.map(s => s.date_played));
+  let streak = 0, cur = new Date();
+  while (dateset.has(cur.toISOString().split('T')[0])) { streak++; cur.setDate(cur.getDate()-1); }
+  document.getElementById('s-total').textContent = spins.length;
+  document.getElementById('s-month').textContent = thisMonth;
+  document.getElementById('s-artists').textContent = artists;
+  document.getElementById('s-streak').textContent = streak;
+}
+
+function renderFeed() {
+  const q = document.getElementById('search-feed').value.toLowerCase();
+  const sys = document.getElementById('filter-system').value;
+  const minR = parseInt(document.getElementById('filter-rating').value) || 0;
+
+  let filtered = spins.filter(s => {
+    if (q && !((s.artist||'').toLowerCase().includes(q)||(s.album||'').toLowerCase().includes(q))) return false;
+    if (sys && s.system !== sys) return false;
+    if (minR && (s.rating||0) < minR) return false;
+    if (selectedMonth) {
+      const d = new Date(s.date_played+'T12:00:00');
+      const k = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+      if (k !== selectedMonth) return false;
+    }
+    return true;
+  });
+
+  document.getElementById('feed-count').textContent = filtered.length + (filtered.length===1?' spin':' spins');
+  const el = document.getElementById('feed-list');
+
+  if (!filtered.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-big">No Spins Yet</div><p>Drop the needle and log your first record.</p></div>`;
+    return;
+  }
+
+  let lastDate = null;
+  el.innerHTML = filtered.map(s => {
+    const d = new Date(s.date_played+'T12:00:00');
+    const dateStr = d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+    let dh = '';
+    if (dateStr !== lastDate) {
+      dh = `<div class="date-rule"><span>${dateStr}</span></div>`;
+      lastDate = dateStr;
+    }
+
+    const aE = encodeURIComponent(s.artist||'');
+    const alE = encodeURIComponent((s.artist||'')+' '+(s.album||''));
+    const discogs = s.discogs_url || `https://www.discogs.com/search/?q=${alE}&type=release`;
+    const wiki = s.wiki_url || `https://en.wikipedia.org/wiki/Special:Search?search=${aE}`;
+    const google = `https://www.google.com/search?q=${alE}+vinyl`;
+    const starsOn = s.rating ? '★'.repeat(s.rating) : '';
+    const starsOff = s.rating ? '☆'.repeat(5-s.rating) : '';
+
+    const artHtml = s.cover_image_url
+      ? `<img src="${s.cover_image_url}" alt="album cover">`
+      : `<div class="cover-placeholder"><div class="cover-vinyl"></div></div>`;
+
+    const pills = [
+      s.grade  ? `<span class="pill pill-grade">${esc(s.grade)}</span>` : '',
+      s.system ? `<span class="pill pill-red">${esc(s.system)}</span>` : '',
+      s.year   ? `<span class="pill">${esc(s.year)}</span>` : '',
+      s.label  ? `<span class="pill">${esc(s.label)}</span>` : '',
+      s.genre  ? `<span class="pill pill-blue">${esc(s.genre)}</span>` : '',
+    ].filter(Boolean).join('');
+
+    const igLink = s.instagram_url
+      ? `<a class="ext-link" href="${s.instagram_url}" target="_blank" style="background:#eef5ee;border-color:#b8d8b8;color:#2a6b2a">Instagram</a>`
+      : '';
+
+    const actionsStyle = currentUser ? 'flex' : 'none';
+
+    return `${dh}<div class="spin-card">
+      <div class="cover-wrap">${artHtml}</div>
+      <div class="card-body">
+        <div>
+          <div class="card-artist">${esc(s.artist)}</div>
+          <div class="card-album">${esc(s.album)}</div>
+          ${s.notes?`<div class="card-notes">${esc(s.notes)}</div>`:''}
+        </div>
+        <div class="card-bottom">
+          <div class="card-meta">
+            ${starsOn?`<span class="stars-row">${starsOn}<span class="stars-empty">${starsOff}</span></span>`:''}
+            ${pills}
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <div class="ext-links">
+              <a class="ext-link" href="${discogs}" target="_blank">Discogs</a>
+              <a class="ext-link" href="${wiki}" target="_blank">Wiki</a>
+              <a class="ext-link" href="${google}" target="_blank">Google</a>
+              ${igLink}
+            </div>
+            <div class="card-actions" style="display:${actionsStyle}">
+              <button class="icon-btn" onclick="openEdit('${s.id}')" title="Edit">✎</button>
+              <button class="icon-btn del" onclick="deleteSpin('${s.id}')" title="Delete">✕</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function buildMonthFilter() {
+  const months = {};
+  spins.forEach(s => {
+    if (!s.date_played) return;
+    const d = new Date(s.date_played+'T12:00:00');
+    const k = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    months[k] = d.toLocaleDateString('en-US',{month:'short',year:'numeric'});
+  });
+  const sorted = Object.entries(months).sort((a,b)=>b[0].localeCompare(a[0]));
+  document.getElementById('month-row').innerHTML =
+    `<button class="month-tag ${!selectedMonth?'active':''}" onclick="filterMonth(null,this)">All</button>`+
+    sorted.map(([k,l])=>`<button class="month-tag ${selectedMonth===k?'active':''}" onclick="filterMonth('${k}',this)">${l}</button>`).join('');
+}
+
+function filterMonth(key, btn) {
+  selectedMonth = key;
+  document.querySelectorAll('.month-tag').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderFeed();
+}
+
+function setStar(n) {
+  currentRating = n;
+  document.querySelectorAll('#star-picker .star-btn').forEach((b,i)=>b.classList.toggle('on',i<n));
+}
+
+function setEditStar(n) {
+  editRating = n;
+  document.querySelectorAll('#edit-star-picker .star-btn').forEach((b,i)=>b.classList.toggle('on',i<n));
+}
+
+function handleImageUpload(e) {
+  const file = e.target.files[0]; if(!file) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    imgData = ev.target.result;
+    const p = document.getElementById('img-preview');
+    p.src = imgData; p.style.display = 'block';
+    document.getElementById('upload-label').textContent = 'Tap to change image';
+  };
+  r.readAsDataURL(file);
+}
+
+let searchTimer;
+function handleQuickSearch(val) {
+  clearTimeout(searchTimer);
+  const box = document.getElementById('suggestions');
+  if (!val||val.length<2) { box.style.display='none'; return; }
+  searchTimer = setTimeout(() => {
+    fetch(`https://api.discogs.com/database/search?q=${encodeURIComponent(val)}&type=release&per_page=8`)
+      .then(r=>r.json())
+      .then(data => {
+        if (!data.results||!data.results.length) { box.style.display='none'; return; }
+        box.innerHTML = data.results.slice(0,7).map(r => {
+          const parts=(r.title||'').split(' - ');
+          const artist=parts[0]||'';
+          const album=parts.slice(1).join(' - ')||r.title;
+          const cover=r.cover_image||'';
+          const year=r.year||''; const label=r.label?r.label[0]:''; const genre=r.genre?r.genre[0]:'';
+          return `<div class="sug-item" onclick='fillFromDiscogs(${JSON.stringify({artist,album,year,label,genre,cover})})'>
+            ${cover?`<img class="sug-thumb" src="${cover}" alt="">`:'<div class="sug-thumb"></div>'}
+            <div class="sug-text">
+              <div class="sug-artist">${esc(artist)}</div>
+              <div class="sug-album">${esc(album)}${year?' · '+year:''}${label?' · '+label:''}</div>
+            </div>
+          </div>`;
+        }).join('');
+        box.style.display = 'block';
+      }).catch(()=>{
+        box.innerHTML=`<div class="sug-item"><div class="sug-text"><div class="sug-album" style="font-style:normal;color:var(--muted)">Add your Discogs API token to enable search</div></div></div>`;
+        box.style.display='block';
+      });
+  }, 400);
+}
+
+function fillFromDiscogs(d) {
+  document.getElementById('f-artist').value=d.artist||'';
+  document.getElementById('f-album').value=d.album||'';
+  document.getElementById('f-year').value=d.year||'';
+  document.getElementById('f-label').value=d.label||'';
+  document.getElementById('f-genre').value=d.genre||'';
+  if (d.cover&&!imgData) {
+    const p=document.getElementById('img-preview');
+    p.src=d.cover; p.style.display='block'; imgData=d.cover;
+    document.getElementById('upload-label').textContent='Tap to change image';
+  }
+  document.getElementById('suggestions').style.display='none';
+  document.getElementById('quick-search').value='';
+}
+
+document.addEventListener('click', e=>{
+  if (!e.target.closest('.search-wrap')) document.getElementById('suggestions').style.display='none';
+});
+
+async function saveEntry() {
+  if (!currentUser) { openLogin(); return; }
+  const artist=document.getElementById('f-artist').value.trim();
+  const album=document.getElementById('f-album').value.trim();
+  const date=document.getElementById('f-date').value;
+  if (!artist||!album||!date) { showToast('Artist, album & date required'); return; }
+
+  const btn = document.getElementById('save-btn');
+  btn.textContent = 'Saving…'; btn.disabled = true;
+
+  const entry = {
+    artist, album,
+    label:    document.getElementById('f-label').value.trim()||null,
+    year:     document.getElementById('f-year').value.trim()||null,
+    genre:    document.getElementById('f-genre').value.trim()||null,
+    date_played: date,
+    system:   document.getElementById('f-system').value||null,
+    grade:    document.getElementById('f-grade').value||null,
+    rating:   currentRating||null,
+    notes:    document.getElementById('f-notes').value.trim()||null,
+    discogs_url:   document.getElementById('f-discogs').value.trim()||null,
+    wiki_url:      document.getElementById('f-wiki').value.trim()||null,
+    instagram_url: document.getElementById('f-instagram').value.trim()||null,
+    cover_image_url: imgData||null,
+  };
+
+  try {
+    const saved = await insertSpin(entry);
+    spins.unshift(saved);
+    showToast('Spin logged');
+    clearForm();
+    showSection('feed', document.querySelector('.nav-pill'));
+    renderFeed(); buildMonthFilter(); updateStats();
+  } catch(err) {
+    showToast('Error saving — check console');
+    console.error(err);
+  }
+  btn.textContent = 'Log This Spin →'; btn.disabled = false;
+}
+
+function clearForm() {
+  ['f-artist','f-album','f-label','f-year','f-genre','f-notes','f-discogs','f-wiki','f-instagram','quick-search'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  document.getElementById('f-date').value=todayStr();
+  document.getElementById('f-system').value='';
+  document.getElementById('f-grade').value='';
+  currentRating=0;
+  document.querySelectorAll('#star-picker .star-btn').forEach(b=>b.classList.remove('on'));
+  imgData='';
+  const p=document.getElementById('img-preview'); p.style.display='none'; p.src='';
+  document.getElementById('upload-label').textContent='Tap to upload album cover photo';
+}
+
+function openEdit(id) {
+  if (!currentUser) { openLogin(); return; }
+  const s=spins.find(s=>s.id===id); if(!s) return;
+  editId=id; editRating=s.rating||0;
+  document.getElementById('e-artist').value=s.artist||'';
+  document.getElementById('e-album').value=s.album||'';
+  document.getElementById('e-label').value=s.label||'';
+  document.getElementById('e-year').value=s.year||'';
+  document.getElementById('e-genre').value=s.genre||'';
+  document.getElementById('e-date').value=s.date_played||'';
+  document.getElementById('e-grade').value=s.grade||'';
+  document.getElementById('e-system').value=s.system||'';
+  document.getElementById('e-notes').value=s.notes||'';
+  document.getElementById('e-instagram').value=s.instagram_url||'';
+  document.querySelectorAll('#edit-star-picker .star-btn').forEach((b,i)=>b.classList.toggle('on',i<editRating));
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+async function saveEdit() {
+  const changes = {
+    artist:       document.getElementById('e-artist').value.trim(),
+    album:        document.getElementById('e-album').value.trim(),
+    label:        document.getElementById('e-label').value.trim()||null,
+    year:         document.getElementById('e-year').value.trim()||null,
+    genre:        document.getElementById('e-genre').value.trim()||null,
+    date_played:  document.getElementById('e-date').value,
+    grade:        document.getElementById('e-grade').value||null,
+    system:       document.getElementById('e-system').value||null,
+    notes:        document.getElementById('e-notes').value.trim()||null,
+    instagram_url:document.getElementById('e-instagram').value.trim()||null,
+    rating:       editRating||null,
+  };
+  try {
+    await updateSpin(editId, changes);
+    const idx = spins.findIndex(s=>s.id===editId);
+    if (idx>-1) spins[idx] = {...spins[idx], ...changes};
+    closeModal(); renderFeed(); updateStats(); showToast('Updated');
+  } catch(err) {
+    showToast('Error updating'); console.error(err);
+  }
+}
+
+function closeModal() { document.getElementById('edit-modal').classList.remove('open'); editId=null; }
+
+function renderStats() {
+  const el=document.getElementById('stats-content');
+  if (!spins.length) {
+    el.innerHTML='<div class="empty-state"><div class="empty-big">No Data Yet</div><p>Log some spins to see your stats.</p></div>';
+    return;
+  }
+  const artistCount={};
+  spins.forEach(s=>{artistCount[s.artist]=(artistCount[s.artist]||0)+1;});
+  const topArtists=Object.entries(artistCount).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const byMonth={};
+  spins.forEach(s=>{
+    if(!s.date_played) return;
+    const d=new Date(s.date_played+'T12:00:00');
+    const k=d.toLocaleDateString('en-US',{month:'short',year:'2-digit'});
+    byMonth[k]=(byMonth[k]||0)+1;
+  });
+  const monthEntries=Object.entries(byMonth).slice(-12);
+  const maxM=Math.max(...monthEntries.map(e=>e[1]),1);
+  const bySys={};
+  spins.forEach(s=>{const k=s.system||'Unspecified';bySys[k]=(bySys[k]||0)+1;});
+  const genreCount={};
+  spins.forEach(s=>{if(s.genre) genreCount[s.genre]=(genreCount[s.genre]||0)+1;});
+  const topGenres=Object.entries(genreCount).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const rated=spins.filter(s=>s.rating);
+  const avgR=rated.length?(rated.reduce((a,s)=>a+s.rating,0)/rated.length).toFixed(1):'—';
+
+  el.innerHTML=`
+    <div class="stats-grid">
+      <div class="stat-box"><span class="n">${spins.length}</span><span class="l">Total Spins</span></div>
+      <div class="stat-box"><span class="n">${new Set(spins.map(s=>s.artist)).size}</span><span class="l">Artists</span></div>
+      <div class="stat-box"><span class="n">${new Set(spins.map(s=>s.album)).size}</span><span class="l">Albums</span></div>
+      <div class="stat-box"><span class="n">${avgR}</span><span class="l">Avg Rating</span></div>
+    </div>
+    <div class="bar-section">
+      <div class="card-title">Spins by Month</div>
+      <div class="bar-chart">
+        ${monthEntries.map(([k,v])=>`<div class="bar-col"><div class="bar-fill" style="height:${Math.round(v/maxM*70)}px"></div><div class="bar-lbl">${k}</div></div>`).join('')}
+      </div>
+    </div>
+    <div class="two-col">
+      <div class="list-card">
+        <div class="card-title">Most Played Artists</div>
+        ${topArtists.map(([a,c])=>`<div class="list-row"><span class="name">${esc(a)}</span><span class="val">${c}</span></div>`).join('')}
+      </div>
+      <div>
+        <div class="list-card" style="margin-bottom:1.5rem">
+          <div class="card-title">By System</div>
+          ${Object.entries(bySys).map(([s,c])=>`<div class="list-row"><span class="name">${esc(s)}</span><span class="val">${c}</span></div>`).join('')}
+        </div>
+        ${topGenres.length?`<div class="list-card"><div class="card-title">By Genre</div>${topGenres.map(([g,c])=>`<div class="list-row"><span class="name">${esc(g)}</span><span class="val">${c}</span></div>`).join('')}</div>`:''}
+      </div>
+    </div>`;
+}
+
+function showToast(msg) {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+function esc(s) {
+  if(!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────
+document.getElementById('f-date').value = todayStr();
+initAuth();
+loadSpins();
+</script>
+</body>
+</html>
