@@ -147,9 +147,11 @@ select option{background:white}
 .sug-album{font-size:0.78rem;color:var(--muted);font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* STARS */
-.star-row{display:flex;gap:3px;margin-top:2px}
-.star-btn{background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--rule2);transition:color 0.1s;padding:0;line-height:1}
+.star-row{display:flex;gap:1px;margin-top:2px}
+.star-btn{background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--rule2);transition:color 0.1s;padding:0 1px;line-height:1;position:relative}
 .star-btn.on{color:var(--accent)}
+.star-btn.half{position:relative;color:var(--rule2)}
+.star-btn.half::before{content:'★';position:absolute;left:1px;top:0;width:50%;overflow:hidden;color:var(--accent);display:inline-block}
 
 /* IMAGE UPLOAD */
 .img-drop{border:2px dashed var(--rule2);border-radius:var(--r);padding:1.25rem;text-align:center;cursor:pointer;transition:border-color 0.15s;background:var(--off)}
@@ -333,12 +335,18 @@ select option{background:white}
       <div class="form-group">
         <label class="field-label">Rating</label>
         <div class="star-row" id="star-picker">
-          <button class="star-btn" onclick="setStar(1)">★</button>
-          <button class="star-btn" onclick="setStar(2)">★</button>
-          <button class="star-btn" onclick="setStar(3)">★</button>
-          <button class="star-btn" onclick="setStar(4)">★</button>
-          <button class="star-btn" onclick="setStar(5)">★</button>
+          <button class="star-btn" data-val="0.5" onclick="setStar(0.5)">★</button>
+          <button class="star-btn" data-val="1" onclick="setStar(1)">★</button>
+          <button class="star-btn" data-val="1.5" onclick="setStar(1.5)">★</button>
+          <button class="star-btn" data-val="2" onclick="setStar(2)">★</button>
+          <button class="star-btn" data-val="2.5" onclick="setStar(2.5)">★</button>
+          <button class="star-btn" data-val="3" onclick="setStar(3)">★</button>
+          <button class="star-btn" data-val="3.5" onclick="setStar(3.5)">★</button>
+          <button class="star-btn" data-val="4" onclick="setStar(4)">★</button>
+          <button class="star-btn" data-val="4.5" onclick="setStar(4.5)">★</button>
+          <button class="star-btn" data-val="5" onclick="setStar(5)">★</button>
         </div>
+        <div style="font-family:var(--font-cond);font-size:0.65rem;color:var(--muted2);margin-top:4px;letter-spacing:0.04em" id="star-label"></div>
       </div>
       <div class="form-group">
         <label class="field-label">Turntable / System</label>
@@ -422,12 +430,18 @@ select option{background:white}
       <div class="form-group">
         <label class="field-label">Rating</label>
         <div class="star-row" id="edit-star-picker">
-          <button class="star-btn" onclick="setEditStar(1)">★</button>
-          <button class="star-btn" onclick="setEditStar(2)">★</button>
-          <button class="star-btn" onclick="setEditStar(3)">★</button>
-          <button class="star-btn" onclick="setEditStar(4)">★</button>
-          <button class="star-btn" onclick="setEditStar(5)">★</button>
+          <button class="star-btn" data-val="0.5" onclick="setEditStar(0.5)">★</button>
+          <button class="star-btn" data-val="1" onclick="setEditStar(1)">★</button>
+          <button class="star-btn" data-val="1.5" onclick="setEditStar(1.5)">★</button>
+          <button class="star-btn" data-val="2" onclick="setEditStar(2)">★</button>
+          <button class="star-btn" data-val="2.5" onclick="setEditStar(2.5)">★</button>
+          <button class="star-btn" data-val="3" onclick="setEditStar(3)">★</button>
+          <button class="star-btn" data-val="3.5" onclick="setEditStar(3.5)">★</button>
+          <button class="star-btn" data-val="4" onclick="setEditStar(4)">★</button>
+          <button class="star-btn" data-val="4.5" onclick="setEditStar(4.5)">★</button>
+          <button class="star-btn" data-val="5" onclick="setEditStar(5)">★</button>
         </div>
+        <div style="font-family:var(--font-cond);font-size:0.65rem;color:var(--muted2);margin-top:4px;letter-spacing:0.04em" id="edit-star-label"></div>
       </div>
       <div class="form-group full"><label class="field-label">Notes</label><textarea id="e-notes"></textarea></div>
       <div class="form-group full"><label class="field-label">Instagram Post URL <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:0.68rem;color:var(--muted2)">— leave blank if not posted</span></label><input type="url" id="e-instagram" placeholder="https://www.instagram.com/p/…"></div>
@@ -657,8 +671,7 @@ function renderFeed() {
     const discogs = s.discogs_url || `https://www.discogs.com/search/?q=${alE}&type=release`;
     const wiki = s.wiki_url || `https://en.wikipedia.org/wiki/Special:Search?search=${aE}`;
     const google = `https://www.google.com/search?q=${alE}+vinyl`;
-    const starsOn = s.rating ? '★'.repeat(s.rating) : '';
-    const starsOff = s.rating ? '☆'.repeat(5-s.rating) : '';
+    const starsHtml = s.rating ? `<span class="stars-row" style="font-size:0.78rem;letter-spacing:1px">${renderStars(s.rating)}</span>` : '';
 
     const artHtml = s.cover_image_url
       ? `<img src="${s.cover_image_url}" alt="album cover">`
@@ -688,7 +701,7 @@ function renderFeed() {
         </div>
         <div class="card-bottom">
           <div class="card-meta">
-            ${starsOn?`<span class="stars-row">${starsOn}<span class="stars-empty">${starsOff}</span></span>`:''}
+            ${starsHtml}
             ${pills}
           </div>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -730,14 +743,36 @@ function filterMonth(key, btn) {
   renderFeed();
 }
 
+function renderStars(n) {
+  // Returns HTML string for displaying n stars (supports halves)
+  let html = '';
+  for (let i = 1; i <= 5; i++) {
+    if (n >= i) html += `<span style="color:var(--accent)">★</span>`;
+    else if (n >= i - 0.5) html += `<span style="position:relative;display:inline-block;color:var(--rule2)">★<span style="position:absolute;left:0;top:0;width:50%;overflow:hidden;color:var(--accent)">★</span></span>`;
+    else html += `<span style="color:var(--rule2)">★</span>`;
+  }
+  return html;
+}
+
+function updateStarPicker(pickerId, labelId, n) {
+  document.querySelectorAll(`#${pickerId} .star-btn`).forEach(b => {
+    const val = parseFloat(b.dataset.val);
+    b.classList.remove('on', 'half');
+    if (n >= val) b.classList.add('on');
+    else if (n >= val - 0.5 && val % 1 === 0) b.classList.add('half');
+  });
+  const label = document.getElementById(labelId);
+  if (label) label.textContent = n ? `${n} / 5` : '';
+}
+
 function setStar(n) {
   currentRating = n;
-  document.querySelectorAll('#star-picker .star-btn').forEach((b,i)=>b.classList.toggle('on',i<n));
+  updateStarPicker('star-picker', 'star-label', n);
 }
 
 function setEditStar(n) {
   editRating = n;
-  document.querySelectorAll('#edit-star-picker .star-btn').forEach((b,i)=>b.classList.toggle('on',i<n));
+  updateStarPicker('edit-star-picker', 'edit-star-label', n);
 }
 
 function handleImageUpload(e) {
@@ -923,7 +958,7 @@ function clearForm() {
   document.getElementById('f-system').value='';
   document.getElementById('f-grade').value='';
   currentRating=0;
-  document.querySelectorAll('#star-picker .star-btn').forEach(b=>b.classList.remove('on'));
+  updateStarPicker('star-picker', 'star-label', 0);
   imgData='';
   const p=document.getElementById('img-preview'); p.style.display='none'; p.src='';
   document.getElementById('upload-label').textContent='Tap to upload album cover photo';
@@ -954,6 +989,7 @@ function openEdit(id) {
     document.getElementById('e-upload-label').textContent = 'Tap to upload or replace cover photo';
   }
   document.querySelectorAll('#edit-star-picker .star-btn').forEach((b,i)=>b.classList.toggle('on',i<editRating));
+  updateStarPicker('edit-star-picker', 'edit-star-label', editRating);
   document.getElementById('edit-modal').classList.add('open');
 }
 
