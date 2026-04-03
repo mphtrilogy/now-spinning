@@ -476,7 +476,7 @@ function setUser(user) {
   if (user) {
     btn.textContent = 'Sign Out';
     btn.classList.add('signed-in');
-    document.querySelectorAll('.owner-only').forEach(el => el.style.display = '');
+    document.querySelectorAll('.owner-only').forEach(el => el.style.display = 'inline-block');
     document.querySelectorAll('.card-actions').forEach(el => el.style.display = 'flex');
   } else {
     btn.textContent = 'Sign In';
