@@ -599,9 +599,10 @@ async function loadSpins(retryCount = 0) {
     try { await db.from('spins').select('id').limit(1); } catch(e) {}
   }
 
+  // Load text data ONLY first — no images, much faster
   const { data, error } = await db
     .from('spins')
-    .select('*')
+    .select('id,artist,album,label,year,genre,date_played,system,grade,rating,notes,discogs_url,wiki_url,instagram_url,created_at')
     .order('date_played', { ascending: false });
 
   if (error) {
@@ -617,6 +618,30 @@ async function loadSpins(retryCount = 0) {
   renderFeed();
   buildMonthFilter();
   updateStats();
+
+  // Load images in the background after feed is shown
+  loadImages();
+}
+
+async function loadImages() {
+  const { data, error } = await db
+    .from('spins')
+    .select('id,cover_image_url')
+    .not('cover_image_url', 'is', null);
+
+  if (error || !data) return;
+
+  data.forEach(row => {
+    if (!row.cover_image_url) return;
+    // Update the spin in memory
+    const spin = spins.find(s => s.id === row.id);
+    if (spin) spin.cover_image_url = row.cover_image_url;
+    // Update the image in the DOM directly
+    const card = document.querySelector(`[data-spin-id="${row.id}"] .cover-wrap`);
+    if (card) {
+      card.innerHTML = `<img src="${row.cover_image_url}" alt="album cover">`;
+    }
+  });
 }
 
 async function insertSpin(entry) {
@@ -730,7 +755,7 @@ function renderFeed() {
 
     const actionsStyle = currentUser ? 'flex' : 'none';
 
-    return `${dh}<div class="spin-card">
+    return `${dh}<div class="spin-card" data-spin-id="${s.id}">
       <div class="cover-wrap">${artHtml}</div>
       <div class="card-body">
         <div>
