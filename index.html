@@ -629,17 +629,17 @@ async function loadImages() {
     .select('id,cover_image_url')
     .not('cover_image_url', 'is', null);
 
-  if (error || !data) return;
+  if (error || !data || !data.length) return;
 
+  let updated = false;
   data.forEach(row => {
-    if (!row.cover_image_url) return;
-    // Update the spin in memory
     const spin = spins.find(s => s.id === row.id);
-    if (spin) spin.cover_image_url = row.cover_image_url;
-    // Update the image in the DOM directly
-    const card = document.querySelector(`[data-spin-id="${row.id}"] .cover-wrap`);
-    if (card) {
-      card.innerHTML = `<img src="${row.cover_image_url}" alt="album cover">`;
+    if (spin && row.cover_image_url) {
+      spin.cover_image_url = row.cover_image_url;
+      updated = true;
+      // Update image directly in DOM
+      const wrap = document.querySelector(`.spin-card[data-spin-id="${spin.id}"] .cover-wrap`);
+      if (wrap) wrap.innerHTML = `<img src="${row.cover_image_url}" alt="album cover" style="width:100%;height:100%;object-fit:cover;display:block">`;
     }
   });
 }
