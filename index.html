@@ -594,15 +594,13 @@ async function doLogin() {
 
 // ─── DATA ─────────────────────────────────────────────────────────
 async function loadSpins(retryCount = 0) {
-  // Wake up the database first with a lightweight ping
   if (retryCount === 0) {
     try { await db.from('spins').select('id').limit(1); } catch(e) {}
   }
 
-  // Load text data ONLY first — no images, much faster
   const { data, error } = await db
     .from('spins')
-    .select('id,artist,album,label,year,genre,date_played,system,grade,rating,notes,discogs_url,wiki_url,instagram_url,created_at')
+    .select('id,artist,album,label,year,genre,date_played,system,grade,rating,notes,discogs_url,wiki_url,instagram_url,cover_image_url,created_at')
     .order('date_played', { ascending: false });
 
   if (error) {
@@ -618,31 +616,9 @@ async function loadSpins(retryCount = 0) {
   renderFeed();
   buildMonthFilter();
   updateStats();
-
-  // Load images in the background after feed is shown
-  loadImages();
 }
 
-async function loadImages() {
-  const { data, error } = await db
-    .from('spins')
-    .select('id,cover_image_url')
-    .not('cover_image_url', 'is', null);
-
-  if (error || !data || !data.length) return;
-
-  let updated = false;
-  data.forEach(row => {
-    const spin = spins.find(s => s.id === row.id);
-    if (spin && row.cover_image_url) {
-      spin.cover_image_url = row.cover_image_url;
-      updated = true;
-      // Update image directly in DOM
-      const wrap = document.querySelector(`.spin-card[data-spin-id="${spin.id}"] .cover-wrap`);
-      if (wrap) wrap.innerHTML = `<img src="${row.cover_image_url}" alt="album cover" style="width:100%;height:100%;object-fit:cover;display:block">`;
-    }
-  });
-}
+async function loadImages() {} // No longer needed — images are URLs now
 
 async function insertSpin(entry) {
   const { data, error } = await db.from('spins').insert([entry]).select().single();
@@ -960,9 +936,11 @@ function fillFromDiscogs(d) {
   document.getElementById('f-label').value = d.label || '';
   document.getElementById('f-genre').value = d.genre || '';
   if (d.url) document.getElementById('f-discogs').value = d.url;
+  // Save Discogs image URL directly — no download needed
   if (d.cover && !imgData) {
     const p = document.getElementById('img-preview');
-    p.src = d.cover; p.style.display = 'block'; imgData = d.cover;
+    p.src = d.cover; p.style.display = 'block';
+    imgData = d.cover; // Store URL not base64
     document.getElementById('upload-label').textContent = 'Tap to change image';
   }
   document.getElementById('suggestions').style.display = 'none';
