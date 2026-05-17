@@ -594,18 +594,22 @@ async function doLogin() {
 
 // ─── DATA ─────────────────────────────────────────────────────────
 async function loadSpins(retryCount = 0) {
+  // Wake up the database first with a lightweight ping
+  if (retryCount === 0) {
+    try { await db.from('spins').select('id').limit(1); } catch(e) {}
+  }
+
   const { data, error } = await db
     .from('spins')
     .select('*')
     .order('date_played', { ascending: false });
 
   if (error) {
-    if (error.code === '57014' && retryCount < 3) {
-      document.getElementById('feed-list').innerHTML = `<div class="loading"><p>Warming up… retrying (${retryCount + 1}/3)</p></div>`;
-      setTimeout(() => loadSpins(retryCount + 1), 2500);
+    if (retryCount < 5) {
+      document.getElementById('feed-list').innerHTML = `<div class="loading"><p>Warming up… retrying (${retryCount + 1}/5)</p></div>`;
+      setTimeout(() => loadSpins(retryCount + 1), 1500);
       return;
     }
-    console.error(error);
     document.getElementById('feed-list').innerHTML = `<div class="loading"><p>Connection issue — please refresh the page.</p></div>`;
     return;
   }
@@ -1122,9 +1126,18 @@ function esc(s) {
 
 // ─── INIT ─────────────────────────────────────────────────────────
 document.getElementById('f-date').value = todayStr();
+
+// Keep-alive ping every 4 minutes to prevent Supabase from sleeping
+function startKeepAlive() {
+  setInterval(async () => {
+    try { await db.from('spins').select('id').limit(1); } catch(e) {}
+  }, 4 * 60 * 1000);
+}
+
 initLogoPress();
 initAuth();
 loadSpins();
+startKeepAlive();
 </script>
 </body>
 </html>
