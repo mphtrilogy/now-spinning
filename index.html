@@ -713,6 +713,19 @@ function renderFeed() {
     const google = `https://www.google.com/search?q=${alE}+vinyl`;
     const starsHtml = s.rating ? `<span class="stars-row" style="font-size:0.78rem;letter-spacing:1px">${renderStars(s.rating)}</span>` : '';
 
+    // Spin history for this record
+    const history = getSpinHistory(s);
+    const spinCount = history.length;
+    const prevSpins = history.filter(h => h.id !== s.id);
+    const lastSpun = prevSpins.length > 0
+      ? new Date(prevSpins[0].date_played+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})
+      : null;
+    const spinHistoryHtml = spinCount > 1
+      ? `<div style="font-family:var(--font-cond);font-size:0.63rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted2);margin-top:4px">
+           Spun ${spinCount}× &nbsp;·&nbsp; Prev: ${lastSpun}
+         </div>`
+      : '';
+
     const artHtml = s.cover_image_url
       ? `<img src="${s.cover_image_url}" alt="album cover">`
       : `<div class="cover-placeholder"><div class="cover-vinyl"></div></div>`;
@@ -737,6 +750,7 @@ function renderFeed() {
         <div>
           <div class="card-artist">${esc(s.artist)}</div>
           <div class="card-album">${esc(s.album)}</div>
+          ${spinHistoryHtml}
           ${s.notes?`<div class="card-notes">${esc(s.notes)}</div>`:''}
         </div>
         <div class="card-bottom">
@@ -844,13 +858,25 @@ const DISCOGS_HEADERS = { 'Authorization': `Discogs token=${DISCOGS_TOKEN}`, 'Us
 
 // Extract release ID from URL or plain number
 function extractDiscogsId(input) {
-  input = input.trim();
-  // Plain number
+  input = (input||'').trim();
   if (/^\d+$/.test(input)) return input;
-  // URL like discogs.com/release/12345 or discogs.com/*/release/12345-Title
   const match = input.match(/release\/(\d+)/);
   if (match) return match[1];
   return null;
+}
+
+// Get all spins of the same record by matching Discogs release ID
+function getSpinHistory(currentSpin) {
+  const id = extractDiscogsId(currentSpin.discogs_url);
+  if (!id) {
+    // Fall back to matching by artist + album
+    return spins.filter(s =>
+      s.artist === currentSpin.artist &&
+      s.album === currentSpin.album
+    ).sort((a,b) => new Date(b.date_played) - new Date(a.date_played));
+  }
+  return spins.filter(s => extractDiscogsId(s.discogs_url) === id)
+    .sort((a,b) => new Date(b.date_played) - new Date(a.date_played));
 }
 
 async function lookupDiscogsInput() {
@@ -877,20 +903,47 @@ async function fetchDiscogsRelease(id) {
       const cover = data.images ? data.images[0].uri : '';
       const url = `https://www.discogs.com/release/${data.id}`;
       fillFromDiscogs({ artist, album, year, label, genre, cover, url });
-      showDiscogsPreview({ artist, album, year, label, genre, cover });
+      showDiscogsPreview({ artist, album, year, label, genre, cover, releaseId: String(data.id) });
       document.getElementById('suggestions').style.display = 'none';
       document.getElementById('quick-search').value = '';
     }
   } catch(e) { showToast('Discogs lookup failed'); }
 }
 
-function showDiscogsPreview({ artist, album, year, label, genre, cover }) {
+function showDiscogsPreview({ artist, album, year, label, genre, cover, releaseId }) {
   const preview = document.getElementById('discogs-preview');
   document.getElementById('discogs-preview-img').src = cover || '';
   document.getElementById('discogs-preview-img').style.display = cover ? 'block' : 'none';
   document.getElementById('discogs-preview-artist').textContent = artist;
   document.getElementById('discogs-preview-album').textContent = album;
   document.getElementById('discogs-preview-meta').textContent = [year, label, genre].filter(Boolean).join(' · ');
+
+  // Show spin history for this record
+  let historyText = '';
+  if (releaseId) {
+    const matches = spins.filter(s => extractDiscogsId(s.discogs_url) === releaseId)
+      .sort((a,b) => new Date(b.date_played) - new Date(a.date_played));
+    if (matches.length > 0) {
+      const last = new Date(matches[0].date_played+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+      historyText = `You've spun this ${matches.length}× — last played ${last}`;
+    }
+  } else {
+    const matches = spins.filter(s => s.artist === artist && s.album === album)
+      .sort((a,b) => new Date(b.date_played) - new Date(a.date_played));
+    if (matches.length > 0) {
+      const last = new Date(matches[0].date_played+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+      historyText = `You've spun this ${matches.length}× — last played ${last}`;
+    }
+  }
+
+  let historyEl = document.getElementById('discogs-preview-history');
+  if (!historyEl) {
+    historyEl = document.createElement('div');
+    historyEl.id = 'discogs-preview-history';
+    historyEl.style.cssText = 'font-family:var(--font-cond);font-size:0.7rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--accent);margin-top:4px';
+    document.getElementById('discogs-preview-meta').after(historyEl);
+  }
+  historyEl.textContent = historyText;
   preview.style.display = 'flex';
 }
 
@@ -1071,6 +1124,18 @@ function renderStats() {
   const artistCount={};
   spins.forEach(s=>{artistCount[s.artist]=(artistCount[s.artist]||0)+1;});
   const topArtists=Object.entries(artistCount).sort((a,b)=>b[1]-a[1]).slice(0,10);
+
+  // Most played albums — group by Discogs ID or artist+album
+  const albumMap={};
+  spins.forEach(s=>{
+    const id = extractDiscogsId(s.discogs_url);
+    const key = id || `${s.artist}||${s.album}`;
+    if (!albumMap[key]) albumMap[key] = { artist: s.artist, album: s.album, count: 0, last: s.date_played };
+    albumMap[key].count++;
+    if (s.date_played > albumMap[key].last) albumMap[key].last = s.date_played;
+  });
+  const topAlbums = Object.values(albumMap).filter(a=>a.count>1).sort((a,b)=>b.count-a.count).slice(0,10);
+
   const byMonth={};
   spins.forEach(s=>{
     if(!s.date_played) return;
@@ -1092,7 +1157,7 @@ function renderStats() {
     <div class="stats-grid">
       <div class="stat-box"><span class="n">${spins.length}</span><span class="l">Total Spins</span></div>
       <div class="stat-box"><span class="n">${new Set(spins.map(s=>s.artist)).size}</span><span class="l">Artists</span></div>
-      <div class="stat-box"><span class="n">${new Set(spins.map(s=>s.album)).size}</span><span class="l">Albums</span></div>
+      <div class="stat-box"><span class="n">${Object.keys(albumMap).length}</span><span class="l">Albums</span></div>
       <div class="stat-box"><span class="n">${avgR}</span><span class="l">Avg Rating</span></div>
     </div>
     <div class="bar-section">
@@ -1101,18 +1166,34 @@ function renderStats() {
         ${monthEntries.map(([k,v])=>`<div class="bar-col"><div class="bar-fill" style="height:${Math.round(v/maxM*70)}px"></div><div class="bar-lbl">${k}</div></div>`).join('')}
       </div>
     </div>
-    <div class="two-col">
+    <div class="two-col" style="margin-bottom:1.5rem">
       <div class="list-card">
         <div class="card-title">Most Played Artists</div>
         ${topArtists.map(([a,c])=>`<div class="list-row"><span class="name">${esc(a)}</span><span class="val">${c}</span></div>`).join('')}
       </div>
-      <div>
-        <div class="list-card" style="margin-bottom:1.5rem">
-          <div class="card-title">By System</div>
-          ${Object.entries(bySys).map(([s,c])=>`<div class="list-row"><span class="name">${esc(s)}</span><span class="val">${c}</span></div>`).join('')}
-        </div>
-        ${topGenres.length?`<div class="list-card"><div class="card-title">By Genre</div>${topGenres.map(([g,c])=>`<div class="list-row"><span class="name">${esc(g)}</span><span class="val">${c}</span></div>`).join('')}</div>`:''}
+      <div class="list-card">
+        <div class="card-title">Most Played Albums</div>
+        ${topAlbums.length ? topAlbums.map(a=>{
+          const last = new Date(a.last+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
+          return `<div class="list-row">
+            <span class="name" style="flex-direction:column;align-items:flex-start;display:flex;gap:1px">
+              <span>${esc(a.artist)}</span>
+              <span style="font-style:italic;font-size:0.8rem;color:var(--muted)">${esc(a.album)}</span>
+            </span>
+            <span style="text-align:right;flex-shrink:0">
+              <span class="val">${a.count}×</span>
+              <div style="font-family:var(--font-cond);font-size:0.6rem;color:var(--muted2);text-transform:uppercase;letter-spacing:0.06em">${last}</div>
+            </span>
+          </div>`;
+        }).join('') : '<div style="font-family:var(--font-head);font-style:italic;font-size:0.85rem;color:var(--muted2);padding:8px 0">Spin a record twice to see it here</div>'}
       </div>
+    </div>
+    <div class="two-col">
+      <div class="list-card">
+        <div class="card-title">By System</div>
+        ${Object.entries(bySys).map(([s,c])=>`<div class="list-row"><span class="name">${esc(s)}</span><span class="val">${c}</span></div>`).join('')}
+      </div>
+      ${topGenres.length?`<div class="list-card"><div class="card-title">By Genre</div>${topGenres.map(([g,c])=>`<div class="list-row"><span class="name">${esc(g)}</span><span class="val">${c}</span></div>`).join('')}</div>`:'<div></div>'}
     </div>`;
 }
 
