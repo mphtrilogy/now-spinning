@@ -1287,30 +1287,6 @@ function renderStats() {
       </div>
     </div>`:''}
 
-    <!-- TOP ARTISTS + TOP ALBUMS -->
-    <div class="two-col" style="margin-bottom:1.5rem">
-      <div class="list-card">
-        <div class="card-title">Most Played Artists</div>
-        ${topArtists.map(([a,c])=>`<div class="list-row"><span class="name">${esc(a)}</span><span class="val">${c}</span></div>`).join('')}
-      </div>
-      <div class="list-card">
-        <div class="card-title">Most Played Albums</div>
-        ${topAlbums.length?topAlbums.map(a=>{
-          const last=new Date(a.last+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
-          return `<div class="list-row">
-            <span class="name" style="flex-direction:column;align-items:flex-start;display:flex;gap:1px">
-              <span>${esc(a.artist)}</span>
-              <span style="font-style:italic;font-size:0.8rem;color:var(--muted)">${esc(a.album)}</span>
-            </span>
-            <span style="text-align:right;flex-shrink:0">
-              <span class="val">${a.count}×</span>
-              <div style="font-family:var(--font-cond);font-size:0.6rem;color:var(--muted2);text-transform:uppercase;letter-spacing:0.06em">${last}</div>
-            </span>
-          </div>`;
-        }).join(''):'<div style="font-family:var(--font-head);font-style:italic;font-size:0.85rem;color:var(--muted2);padding:8px 0">Spin a record twice to see it here</div>'}
-      </div>
-    </div>
-
     <!-- TOP RATED + TURNTABLE LEADERBOARD -->
     <div class="two-col" style="margin-bottom:1.5rem">
       <div class="list-card">
