@@ -1340,25 +1340,32 @@ function renderStats() {
       </div>
     </div>
 
-    <!-- GENRE + REDISCOVERY -->
+    <!-- DIVIDER -->
+    <div style="border-top:2px solid var(--ink);margin:2rem 0 1.5rem;display:flex;align-items:center;gap:12px">
+      <span style="font-family:var(--font-cond);font-size:0.7rem;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Full Play History</span>
+    </div>
+
+    <!-- MOST PLAYED ARTISTS + ALBUMS (full uncapped lists) -->
     <div class="two-col" style="margin-bottom:1.5rem">
-      ${topGenres.length?`<div class="list-card">
-        <div class="card-title">By Genre</div>
-        ${topGenres.map(([g,c])=>`<div class="list-row"><span class="name">${esc(g)}</span><span class="val">${c}</span></div>`).join('')}
-      </div>`:'<div></div>'}
       <div class="list-card">
-        <div class="card-title">Due for a Revisit</div>
-        <div style="font-family:var(--font-cond);font-size:0.63rem;color:var(--muted2);margin-bottom:0.75rem;letter-spacing:0.04em">Spun once, 60+ days ago</div>
-        ${forgotten.length?forgotten.map(a=>{
-          const daysSince=Math.round((now-new Date(a.last+'T12:00:00'))/(1000*60*60*24));
+        <div class="card-title">Most Played Artists</div>
+        ${topArtists.map(([a,c])=>`<div class="list-row"><span class="name">${esc(a)}</span><span class="val">${c}</span></div>`).join('')}
+      </div>
+      <div class="list-card">
+        <div class="card-title">Most Played Albums</div>
+        ${topAlbums.length?topAlbums.map(a=>{
+          const last=new Date(a.last+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
           return `<div class="list-row">
             <span class="name" style="flex-direction:column;align-items:flex-start;display:flex;gap:1px">
               <span>${esc(a.artist)}</span>
               <span style="font-style:italic;font-size:0.8rem;color:var(--muted)">${esc(a.album)}</span>
             </span>
-            <span style="font-family:var(--font-cond);font-size:0.63rem;color:var(--muted2);text-transform:uppercase;letter-spacing:0.04em;flex-shrink:0">${daysSince}d ago</span>
+            <span style="text-align:right;flex-shrink:0">
+              <span class="val">${a.count}×</span>
+              <div style="font-family:var(--font-cond);font-size:0.6rem;color:var(--muted2);text-transform:uppercase;letter-spacing:0.06em">${last}</div>
+            </span>
           </div>`;
-        }).join(''):'<div style="font-family:var(--font-head);font-style:italic;font-size:0.85rem;color:var(--muted2);padding:8px 0">Nothing forgotten yet!</div>'}
+        }).join(''):'<div style="font-family:var(--font-head);font-style:italic;font-size:0.85rem;color:var(--muted2);padding:8px 0">Spin a record twice to see it here</div>'}
       </div>
     </div>`;
 }
