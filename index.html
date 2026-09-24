@@ -1137,7 +1137,7 @@ function renderStats() {
   // ── BASIC COUNTS ──
   const artistCount={};
   spins.forEach(s=>{artistCount[s.artist]=(artistCount[s.artist]||0)+1;});
-  const topArtists=Object.entries(artistCount).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const topArtists=Object.entries(artistCount).sort((a,b)=>b[1]-a[1]);
 
   // ── ALBUM MAP ──
   const albumMap={};
@@ -1149,7 +1149,7 @@ function renderStats() {
     if(s.date_played>albumMap[key].last) albumMap[key].last=s.date_played;
     if(s.rating){albumMap[key].rating+=s.rating;albumMap[key].rcount++;}
   });
-  const topAlbums=Object.values(albumMap).filter(a=>a.count>1).sort((a,b)=>b.count-a.count).slice(0,10);
+  const topAlbums=Object.values(albumMap).filter(a=>a.count>1).sort((a,b)=>b.count-a.count);
 
   // ── TOP RATED ──
   const topRated=Object.values(albumMap).filter(a=>a.rcount>0)
